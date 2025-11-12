@@ -9,10 +9,10 @@
     "fmt": "prettier -w ."
   },
   "dependencies": {
-    "jose": "^5.9.3"
+    "jose": "^5.10.0"
   },
   "devDependencies": {
-    "wrangler": "^4.0.0",
-    "prettier": "^3.3.3"
+    "prettier": "^3.3.3",
+    "wrangler": "^4.0.0"
   }
 }

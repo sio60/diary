@@ -11,30 +11,23 @@ const Stack = createNativeStackNavigator();
 function RootNavigator() {
   const { loading, user } = useAuth();
 
-  if (loading) return null; // 스플래시 사용 시 대체 가능
+  if (loading) return null; // 스플래시로 대체 가능
 
   return (
-    <Stack.Navigator screenOptions={{ headerTitleAlign: "center" }}>
+    <Stack.Navigator
+      key={user ? "app" : "auth"}             // ✅ user 변화 시 스택 리셋(홈으로 전환)
+      screenOptions={{ headerTitleAlign: "center" }}
+    >
       {user ? (
-        <>
-          <Stack.Screen
-            name="Home"
-            component={HomeScreen}
-            options={{ title: "메인" }}
-          />
-        </>
+        <Stack.Screen
+          name="Home"
+          component={HomeScreen}
+          options={{ title: "메인", headerBackVisible: false }} // ← 뒤로가기 숨김(선택)
+        />
       ) : (
         <>
-          <Stack.Screen
-            name="Login"
-            component={LoginScreen}
-            options={{ title: "로그인" }}
-          />
-          <Stack.Screen
-            name="Register"
-            component={RegisterScreen}
-            options={{ title: "회원가입" }}
-          />
+          <Stack.Screen name="Login" component={LoginScreen} options={{ title: "로그인" }} />
+          <Stack.Screen name="Register" component={RegisterScreen} options={{ title: "회원가입" }} />
         </>
       )}
     </Stack.Navigator>

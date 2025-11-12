@@ -1,0 +1,24 @@
+# Node / Wrangler
+node_modules/
+dist/
+.bundle/
+.cache/
+.wrangler/
+.vscode/
+.idea/
+.DS_Store
+
+# Environment & secrets
+.env
+.dev.vars
+.env.local
+.env.*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS junk
+Thumbs.db

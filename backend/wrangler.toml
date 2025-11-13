@@ -4,7 +4,7 @@ compatibility_date = "2025-11-12"
 [vars]
 # 배포 환경에서는 wrangler secret 로 넣는걸 권장
 # CORS_ORIGIN 예: 앱 프론트 배포 도메인
-CORS_ORIGIN = "exp://192.168.0.39:8081"
+CORS_ORIGIN = "exp://192.168.0.14:8081"
 
 [placement]
 mode = "smart"

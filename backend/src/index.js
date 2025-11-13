@@ -6,6 +6,7 @@ import { getProfile, upsertProfile } from "./routes/profile.js";
 
 export default {
   async fetch(request, env, ctx) {
+    // CORS preflight 처리
     const pf = preflight(env, request);
     if (pf) return pf;
 
@@ -14,38 +15,51 @@ export default {
     console.log("ENTRY", request.method, pathname);
 
     try {
+      // === Auth 라우트들 ===
       if (request.method === "POST" && pathname === "/auth/register") {
-        return withCORS(env, await postRegister(request, env));
+        const res = await postRegister(request, env);
+        return withCORS(env, res, request);
       }
+
       if (request.method === "POST" && pathname === "/auth/login") {
-        return withCORS(env, await postLogin(request, env));
+        const res = await postLogin(request, env);
+        return withCORS(env, res, request);
       }
+
       if (request.method === "GET" && pathname === "/auth/me") {
-        return withCORS(env, await getMe(request, env));
+        const res = await getMe(request, env);
+        return withCORS(env, res, request);
       }
 
-      // ✅ profile
+      // === Profile 라우트들 ===
       if (request.method === "GET" && pathname === "/profile") {
-        return withCORS(env, await getProfile(request, env));
+        const res = await getProfile(request, env);
+        return withCORS(env, res, request);
       }
+
       if (request.method === "POST" && pathname === "/profile") {
-        return withCORS(env, await upsertProfile(request, env));
+        const res = await upsertProfile(request, env);
+        return withCORS(env, res, request);
       }
 
+      // 루트 핑
       if (request.method === "GET" && pathname === "/") {
-        return withCORS(env, json({ ok: true, service: "diary" }));
+        const res = json({ ok: true, service: "diary" });
+        return withCORS(env, res, request);
       }
 
-      // json 헬퍼가 (data, init) 형식이니까 이렇게 써주는 게 안전
+      // 그 외는 404
       return withCORS(
         env,
-        json({ message: "Not Found", path: pathname }, { status: 404 })
+        json({ message: "Not Found", path: pathname }, { status: 404 }),
+        request
       );
     } catch (e) {
       console.error(e);
       return withCORS(
         env,
-        json({ message: "Server Error" }, { status: 500 })
+        json({ message: "Not Found v2", path: pathname }, { status: 404 }),
+        request
       );
     }
   },

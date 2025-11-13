@@ -1,62 +1,64 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
-import { apiLogin, apiRegister, apiMe, tokenStore } from "../lib/api";
+import {
+  apiLogin, apiRegister, apiMe, apiGetProfile, tokenStore
+} from "../lib/api";
 
 const AuthCtx = createContext(null);
-
-// 🔧 DEV 로그
 const DEV = __DEV__;
 const dbg = (...a) => DEV && console.log("[Auth]", ...a);
-
-// ✅ 응답 스키마 강제: { token, user:{...} } 없으면 에러
-function expectAuthPayload(data, label) {
-  if (!data || typeof data !== "object" || !data.token || !data.user) {
-    const snap = typeof data === "string" ? data : JSON.stringify(data);
-    throw new Error(`${label} 응답 형식 오류: token/user 누락 → ${snap?.slice(0,120)}`);
-  }
-  return data;
-}
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const hydrate = useCallback(async () => {
-    dbg("hydrate:start");
-    try {
-      const t = await tokenStore.getToken();
-      dbg("hydrate:token?", !!t, t ? t.slice(0,12) + "..." : null);
-      if (!t) { setUser(null); return; }
-      const me = await apiMe();           // 기대: { user:{...} }
-      dbg("hydrate:me", me?.user);
-      setUser(me?.user || null);
-    } catch (e) {
-      dbg("hydrate:error", e?.message || String(e));
-      setUser(null);
-      await tokenStore.setToken(null);    // 토큰 불일치/만료 정리
-    }
+  // user 병합 헬퍼
+  const mergeUser = useCallback((me, profile) => {
+    const u = me?.user || me || {};
+    return { ...u, ...(profile || {}) };
   }, []);
 
+  // 프로필 리프레시(외부 노출용)
+  const refreshUser = useCallback(async () => {
+    try {
+      const t = await tokenStore.getToken();
+      if (!t) { setUser(null); return null; }
+      const me = await apiMe();                // { user }
+      let profile = {};
+      try { profile = await apiGetProfile(); } catch {}
+      const merged = mergeUser(me, profile);   // { id, email, nickname, birth, first_day, mbti ...}
+      setUser(merged);
+      return merged;
+    } catch (e) {
+      dbg("refreshUser:error", e?.message || String(e));
+      setUser(null);
+      await tokenStore.setToken(null);
+      return null;
+    }
+  }, [mergeUser]);
+
+  // 초기 하이드레이트
   useEffect(() => {
-    (async () => { await hydrate(); setLoading(false); })();
-  }, [hydrate]);
+    (async () => { await refreshUser(); setLoading(false); })();
+  }, [refreshUser]);
+
+  // 프로필 로컬 업데이트 (화면에서 즉시 반영)
+  const updateProfileLocal = useCallback((patch) => {
+    setUser((u) => (u ? { ...u, ...patch } : patch));
+  }, []);
 
   const login = async ({ email, password }) => {
     dbg("login:req", email);
-    const raw = await apiLogin({ email, password });   // api.js에서 fetch
-    const data = expectAuthPayload(raw, "login");      // ✨ 스키마 보증
+    const data = await apiLogin({ email, password }); // { token, user }
     await tokenStore.setToken(data.token);
-    setUser(data.user);
-    dbg("login:ok", data.user?.id || data.user?.email);
+    await refreshUser(); // 로그인 직후 프로필까지 머지
     return data;
   };
 
   const register = async ({ email, password, nickname }) => {
     dbg("register:req", email, nickname);
-    const raw = await apiRegister({ email, password, nickname });
-    const data = expectAuthPayload(raw, "register");   // ✨ 스키마 보증
+    const data = await apiRegister({ email, password, nickname });
     await tokenStore.setToken(data.token);
-    setUser(data.user);
-    dbg("register:ok", data.user?.id || data.user?.email);
+    await refreshUser(); // 회원가입 직후 프로필까지 머지
     return data;
   };
 
@@ -67,7 +69,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthCtx.Provider value={{ user, loading, login, register, logout }}>
+    <AuthCtx.Provider value={{ user, loading, login, register, logout, refreshUser, updateProfileLocal }}>
       {children}
     </AuthCtx.Provider>
   );

@@ -9,7 +9,7 @@ import WelcomeScreen from "./src/screens/WelcomeScreen";
 import LoginScreen from "./src/screens/LoginScreen";
 import RegisterScreen from "./src/screens/RegisterScreen";
 import HomeScreen from "./src/screens/HomeScreen";
-import ProfileSetupScreen from "./src/screens/ProfileSetupScreen"; // ✅ 추가
+import ProfileSetupScreen from "./src/screens/ProfileSetupScreen";
 import { applyGlobalTextStyles } from "./src/theme/fontSetup";
 import colors from "./src/theme/colors";
 
@@ -19,8 +19,8 @@ function RootNavigator() {
   const { loading, user } = useAuth();
   if (loading) return null;
 
-  // ✅ 프로필 입력이 완료됐는지 판단 (백엔드에서 유저에 내려주도록)
-  const profileDone = !!(user?.birthday && user?.first_met && user?.mbti);
+  // ✅ 백엔드 키와 동일하게 체크
+  const profileDone = !!(user?.birth && user?.first_day && user?.mbti);
 
   return (
     <Stack.Navigator
@@ -34,14 +34,12 @@ function RootNavigator() {
     >
       {user ? (
         profileDone ? (
-          // 프로필 완료 → 홈
           <Stack.Screen
             name="Home"
             component={HomeScreen}
             options={{ title: "메인", headerBackVisible: false }}
           />
         ) : (
-          // 프로필 미완료 → 프로필 설정 먼저
           <>
             <Stack.Screen
               name="ProfileSetup"
@@ -56,7 +54,6 @@ function RootNavigator() {
           </>
         )
       ) : (
-        // 인증 전
         <>
           <Stack.Screen name="Welcome" component={WelcomeScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />

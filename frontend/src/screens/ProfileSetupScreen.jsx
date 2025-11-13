@@ -1,5 +1,4 @@
-// src/screens/ProfileSetupScreen.jsx
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert,
   KeyboardAvoidingView, Platform, ScrollView, TouchableWithoutFeedback, Keyboard
@@ -7,7 +6,7 @@ import {
 import Screen from "../components/Screen";
 import colors from "../theme/colors";
 import { useAuth } from "../context/AuthContext";
-import { apiUpdateProfile } from "../lib/api";
+import { apiGetProfile, apiUpsertProfile } from "../lib/api";
 
 const MBTI_LIST = [
   "ISTJ","ISFJ","INFJ","INTJ",
@@ -16,30 +15,69 @@ const MBTI_LIST = [
   "ESTJ","ESFJ","ENFJ","ENTJ",
 ];
 
+// YYYYMMDD 또는 YYYY-MM-DD → YYYY-MM-DD
+function normalizeDate(input) {
+  const s = String(input || "").trim();
+  if (/^\d{8}$/.test(s)) {
+    const y = s.slice(0, 4), m = s.slice(4, 6), d = s.slice(6, 8);
+    return `${y}-${m}-${d}`;
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  return null;
+}
+
 export default function ProfileSetupScreen({ navigation, route }) {
-  const { user } = useAuth();
+  const { user, updateProfileLocal } = useAuth();
   const nickname = route?.params?.nickname ?? user?.nickname ?? "";
 
-  const [birth, setBirth] = useState("");       // YYYY-MM-DD
-  const [firstDay, setFirstDay] = useState(""); // YYYY-MM-DD
+  const [birth, setBirth] = useState("");
+  const [firstDay, setFirstDay] = useState("");
   const [mbti, setMbti] = useState("");
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const validDate = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s);
+  // 기존 프로필 불러오기
+  useEffect(() => {
+    (async () => {
+      try {
+        const p = await apiGetProfile(); // { birth, first_day, mbti } or {}
+        if (p?.birth) setBirth(p.birth);
+        if (p?.first_day) setFirstDay(p.first_day);
+        if (p?.mbti) setMbti(p.mbti);
+      } catch {}
+    })();
+  }, []);
 
   const onSave = async () => {
-    if (!validDate(birth)) return Alert.alert("생일 형식", "YYYY-MM-DD 로 입력해줘.");
-    if (!validDate(firstDay)) return Alert.alert("처음 만난 날 형식", "YYYY-MM-DD 로 입력해줘.");
-    if (!MBTI_LIST.includes(mbti)) return Alert.alert("MBTI", "16가지 중 하나를 선택해줘.");
+    const normBirth = normalizeDate(birth);
+    const normFirst = normalizeDate(firstDay);
+
+    if (!normBirth) {
+      return Alert.alert("생일 형식 안내", "YYYY-MM-DD 또는 YYYYMMDD 형식으로 입력해 주세요.");
+    }
+    if (!normFirst) {
+      return Alert.alert("처음 만난 날 형식 안내", "YYYY-MM-DD 또는 YYYYMMDD 형식으로 입력해 주세요.");
+    }
+    if (!MBTI_LIST.includes(mbti)) {
+      return Alert.alert("MBTI 선택", "16가지 유형 중 하나를 선택해 주세요.");
+    }
+
     try {
       setLoading(true);
-      await apiUpdateProfile({ birth, first_day: firstDay, mbti });
+      // 서버 저장
+      const saved = await apiUpsertProfile({ birth: normBirth, first_day: normFirst, mbti });
+      // 컨텍스트 즉시 반영 (네비 분기 조건 만족)
+      updateProfileLocal({ birth: normBirth, first_day: normFirst, mbti, ...(saved || {}) });
       navigation.reset({ index: 0, routes: [{ name: "Home" }] });
     } catch (e) {
-      Alert.alert("저장 실패", e?.message || "잠시 후 다시 시도해줘.");
-    } finally { setLoading(false); }
+      Alert.alert("저장 실패", e?.message || "잠시 후 다시 시도해 주세요.");
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const onBlurBirth = () => { const n = normalizeDate(birth); if (n) setBirth(n); };
+  const onBlurFirst = () => { const n = normalizeDate(firstDay); if (n) setFirstDay(n); };
 
   return (
     <Screen>
@@ -49,53 +87,47 @@ export default function ProfileSetupScreen({ navigation, route }) {
         keyboardVerticalOffset={64}
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <ScrollView
-            contentContainerStyle={s.scroll}
-            keyboardShouldPersistTaps="handled"
-          >
+          <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
             <View style={s.nickRow}>
               <Text style={s.nickBadge}>닉네임: {nickname || "미설정"}</Text>
             </View>
 
-            <Text style={s.label}>생일 (YYYY-MM-DD)</Text>
+            <Text style={s.label}>생일 (YYYY-MM-DD 또는 YYYYMMDD)</Text>
             <TextInput
               style={s.input}
-              placeholder="예) 2001-05-21"
+              placeholder="예) 2001-05-21 또는 20010521"
               placeholderTextColor="#A87C7C"
               value={birth}
               onChangeText={setBirth}
               autoCapitalize="none"
               keyboardType="numbers-and-punctuation"
               returnKeyType="next"
+              onBlur={onBlurBirth}
             />
 
-            <Text style={s.label}>처음 만난 날 (YYYY-MM-DD)</Text>
+            <Text style={s.label}>처음 만난 날 (YYYY-MM-DD 또는 YYYYMMDD)</Text>
             <TextInput
               style={s.input}
-              placeholder="예) 2024-09-16"
+              placeholder="예) 2024-09-16 또는 20240916"
               placeholderTextColor="#A87C7C"
               value={firstDay}
               onChangeText={setFirstDay}
               autoCapitalize="none"
               keyboardType="numbers-and-punctuation"
               returnKeyType="next"
+              onBlur={onBlurFirst}
             />
 
             <Text style={s.label}>MBTI</Text>
 
-            {/* 드롭다운 래퍼: zIndex/elevation + 내부 스크롤 */}
             <View style={s.ddWrap}>
               <TouchableOpacity style={s.ddBtn} onPress={() => setOpen(v => !v)}>
-                <Text style={s.ddBtnTx}>{mbti || "선택하세요"}</Text>
+                <Text style={s.ddBtnTx}>{mbti || "선택해 주세요"}</Text>
               </TouchableOpacity>
 
               {open && (
                 <View style={s.ddMenu}>
-                  <ScrollView
-                    style={{ maxHeight: 260 }}
-                    nestedScrollEnabled
-                    keyboardShouldPersistTaps="handled"
-                  >
+                  <ScrollView style={{ maxHeight: 260 }} nestedScrollEnabled keyboardShouldPersistTaps="handled">
                     {MBTI_LIST.map((t) => {
                       const active = mbti === t;
                       return (
@@ -117,7 +149,6 @@ export default function ProfileSetupScreen({ navigation, route }) {
               {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.btnTx}>저장하고 시작하기</Text>}
             </TouchableOpacity>
 
-            {/* 아래 여백: 마지막 버튼이 키보드에 가려지지 않도록 */}
             <View style={{ height: 32 }} />
           </ScrollView>
         </TouchableWithoutFeedback>
@@ -147,12 +178,7 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-
-  // Dropdown
-  ddWrap: {
-    marginBottom: 8,
-    zIndex: 100,          // iOS
-  },
+  ddWrap: { marginBottom: 8, zIndex: 100 },
   ddBtn: {
     backgroundColor: colors.surface,
     padding: 14,
@@ -160,20 +186,18 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: colors.border,
   },
   ddBtnTx: { color: colors.text, fontWeight: "700" },
-
   ddMenu: {
     marginTop: 6,
     backgroundColor: colors.surface,
     borderRadius: 12,
     borderWidth: 1, borderColor: colors.border,
     overflow: "hidden",
-    elevation: 6,         // Android z-order
+    elevation: 6,
   },
   ddItem: { paddingVertical: 12, paddingHorizontal: 14 },
   ddItemActive: { backgroundColor: colors.primary },
   ddItemTx: { color: colors.text, fontWeight: "700" },
   ddItemTxActive: { color: "#fff" },
-
   btn: {
     backgroundColor: colors.primary, padding: 16, borderRadius: 12,
     alignItems: "center", marginTop: 12,

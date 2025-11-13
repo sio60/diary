@@ -7,7 +7,6 @@ export default function WelcomeScreen({ navigation }) {
   return (
     <Screen>
       <View style={s.wrap}>
-        {/* 로고: assets/adaptive-icon.png 사용 (자기 로고 파일 있으면 여기 경로만 바꿔) */}
         <Image source={require("../../assets/logo.png")} style={s.logo} />
 
         <TouchableOpacity style={s.btn} onPress={() => navigation.navigate("Login")}>

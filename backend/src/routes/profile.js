@@ -26,7 +26,9 @@ function isDateString(v) {
 // GET /profile
 export async function getProfile(request, env) {
   const token = getBearer(request);
-  if (!token) return json({ message: "Unauthorized" }, { status: 401 });
+  if (!token) {
+    return json({ message: "Unauthorized" }, { status: 401 });
+  }
 
   let payload;
   try {
@@ -36,7 +38,9 @@ export async function getProfile(request, env) {
   }
 
   const user = await sbSelectUserById(env, payload.sub);
-  if (!user) return json({ message: "User not found" }, { status: 404 });
+  if (!user) {
+    return json({ message: "User not found" }, { status: 404 });
+  }
 
   return json({
     profile: {
@@ -50,7 +54,9 @@ export async function getProfile(request, env) {
 // POST /profile
 export async function upsertProfile(request, env) {
   const token = getBearer(request);
-  if (!token) return json({ message: "Unauthorized" }, { status: 401 });
+  if (!token) {
+    return json({ message: "Unauthorized" }, { status: 401 });
+  }
 
   let payload;
   try {
